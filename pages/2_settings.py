@@ -5,6 +5,7 @@ import streamlit as st
 from components.auth import require_approved
 from components.config import secret
 from services.settings_service import get_all_settings, save_setting
+from services.teams_service import send_teams_alert
 
 st.set_page_config(page_title="모니터 설정", page_icon="⚙️", layout="wide")
 profile = require_approved()
@@ -33,7 +34,8 @@ with st.form("dashboard_settings"):
     schedule_mode = st.selectbox("반복 방식", ["daily", "weekly", "monthly"], index=["daily", "weekly", "monthly"].index(dashboard["schedule_mode"]))
     schedule_time = st.time_input("수집 시간", value=time.fromisoformat(dashboard["schedule_times"][0]))
     alert_enabled = st.toggle("알림 사용", value=bool(dashboard["alert_enabled"]))
-    alert_channel = st.selectbox("알림 채널", ["teams", "email", "kakao"], index=["teams", "email", "kakao"].index(dashboard["alert_channel"]))
+    alert_channel = st.selectbox("알림 채널", ["teams"], index=0,
+                                 help="현재 Teams Workflow/Incoming Webhook 알림을 지원합니다.")
     saved = st.form_submit_button("설정 저장", disabled=not profile.can_edit)
 if saved:
     try:
@@ -64,3 +66,11 @@ st.write({
     "네이버 Client Secret": "설정됨" if secret("NAVER_CLIENT_SECRET") else "미설정",
     "Teams Webhook": "설정됨" if secret("TEAMS_WEBHOOK_URL") else "미설정",
 })
+
+if st.button("Teams 테스트 알림 보내기", disabled=not profile.can_edit):
+    try:
+        send_teams_alert({"keywords": 1, "surges": 1, "matched": 1, "total_today": 1},
+                         title="Olive Teams 연동 테스트")
+        st.success("Teams 테스트 알림을 전송했습니다.")
+    except Exception as exc:
+        st.error(str(exc))

@@ -5,6 +5,7 @@ from unittest.mock import Mock, patch
 from services.naver_datalab_service import search_trends
 from services.naver_news_service import search_news
 from services.naver_shopping_service import search_shopping
+from services.naver_shopping_insight_service import keyword_trends
 
 
 class NaverServicesTest(unittest.TestCase):
@@ -42,6 +43,26 @@ class NaverServicesTest(unittest.TestCase):
         result = search_trends(date(2026, 8, 1), date(2026, 8, 6), [{"groupName": "세럼", "keywords": ["비타 세럼"]}])
         self.assertEqual(result[0]["title"], "세럼")
         self.assertEqual(request.call_args.kwargs["json"]["startDate"], "2026-08-01")
+
+    @patch("services.naver_common.secret", side_effect=lambda name, required=False: "configured")
+    @patch("services.naver_common.httpx.request")
+    def test_shopping_insight_keyword_payload(self, request, _secret):
+        response = Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {"results": [{"title": "세럼", "data": []}]}
+        request.return_value = response
+        result = keyword_trends(date(2026, 8, 1), date(2026, 8, 6), "50000002",
+                                [{"name": "세럼", "param": ["비타 세럼"]}], device="mo", ages=["20"])
+        self.assertEqual(result[0]["title"], "세럼")
+        payload = request.call_args.kwargs["json"]
+        self.assertEqual(payload["category"], "50000002")
+        self.assertEqual(payload["device"], "mo")
+        self.assertEqual(request.call_args.args[1], "https://openapi.naver.com/v1/datalab/shopping/category/keywords")
+
+    def test_shopping_insight_rejects_invalid_dates(self):
+        with self.assertRaises(ValueError):
+            keyword_trends(date(2026, 8, 6), date(2026, 8, 1), "50000002",
+                           [{"name": "세럼", "param": ["세럼"]}])
 
 
 if __name__ == "__main__":

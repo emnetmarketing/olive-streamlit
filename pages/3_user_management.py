@@ -1,7 +1,7 @@
 import streamlit as st
 
 from components.auth import require_approved
-from services.admin_service import delete_account, list_profiles, update_account
+from services.admin_service import delete_account, list_audit_logs, list_profiles, update_account
 
 st.set_page_config(page_title="사용자 권한 관리", page_icon="🔐", layout="wide")
 actor = require_approved()
@@ -33,9 +33,40 @@ for user in profiles:
                 st.success("변경했습니다."); st.rerun()
             except Exception as exc:
                 st.error(str(exc))
+        quick1, quick2, quick3 = st.columns(3)
+        if user["status"] == "pending" and quick1.button("승인", key=f"approve_{user['id']}", use_container_width=True):
+            try:
+                update_account(actor, user["id"], status="approved")
+                st.success("승인했습니다.")
+                st.rerun()
+            except Exception as exc:
+                st.error(str(exc))
+        if user["status"] == "pending" and quick2.button("거절", key=f"reject_{user['id']}", use_container_width=True):
+            try:
+                update_account(actor, user["id"], status="rejected")
+                st.success("거절했습니다.")
+                st.rerun()
+            except Exception as exc:
+                st.error(str(exc))
+        if user["id"] != actor.id and user["status"] == "approved" and quick3.button(
+                "비활성화", key=f"disable_{user['id']}", use_container_width=True):
+            try:
+                update_account(actor, user["id"], status="disabled")
+                st.success("비활성화했습니다.")
+                st.rerun()
+            except Exception as exc:
+                st.error(str(exc))
         if user["id"] != actor.id and action_col.button("계정 삭제", key=f"delete_{user['id']}", use_container_width=True):
             try:
                 delete_account(actor, user["id"])
                 st.success("삭제했습니다."); st.rerun()
             except Exception as exc:
                 st.error(str(exc))
+
+st.divider()
+st.subheader("관리 감사 기록")
+try:
+    logs = list_audit_logs(actor)
+    st.dataframe(logs, use_container_width=True, hide_index=True)
+except Exception as exc:
+    st.error(f"감사 기록을 불러오지 못했습니다: {exc}")

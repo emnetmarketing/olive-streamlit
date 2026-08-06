@@ -19,6 +19,15 @@ class AnalysisServiceTest(unittest.TestCase):
     def test_empty_product_match(self):
         self.assertEqual(best_product_match("세럼", []), ("", "", 0.0))
 
+    def test_duplicate_keywords_are_aggregated(self):
+        result = analyze_trends([
+            {"keyword": "세럼", "today": 10, "yesterday": 2},
+            {"keyword": "세럼", "today": 20, "yesterday": 3},
+        ], [])
+        self.assertEqual(len(result), 1)
+        self.assertEqual(int(result.iloc[0]["today"]), 30)
+        self.assertEqual(int(result.iloc[0]["yesterday"]), 5)
+
 
 if __name__ == "__main__":
     unittest.main()

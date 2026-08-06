@@ -15,6 +15,14 @@ def list_profiles(actor: UserProfile) -> list[dict]:
     return create_admin_client().table("profiles").select("id,email,display_name,role,status,requested_at,approved_at").order("requested_at").execute().data
 
 
+def list_audit_logs(actor: UserProfile, limit: int = 100) -> list[dict]:
+    _require_master(actor)
+    safe_limit = max(1, min(int(limit), 500))
+    return (create_admin_client().table("audit_logs")
+            .select("id,actor_user_id,action,target_user_id,details,created_at")
+            .order("created_at", desc=True).limit(safe_limit).execute().data)
+
+
 def update_account(actor: UserProfile, target_id: str, *, status: str | None = None, role: str | None = None) -> None:
     _require_master(actor)
     admin = create_admin_client()
@@ -22,13 +30,16 @@ def update_account(actor: UserProfile, target_id: str, *, status: str | None = N
     approved_masters = admin.table("profiles").select("id", count="exact").eq("role", "master").eq("status", "approved").execute()
     master_count = approved_masters.count or 0
     next_role, next_status = role or target["role"], status or target["status"]
-    if next_role == "master" and next_status == "approved" and target["role"] != "master" and master_count >= 2:
+    target_is_approved_master = target["role"] == "master" and target["status"] == "approved"
+    if next_role == "master" and next_status == "approved" and not target_is_approved_master and master_count >= 2:
         raise ValueError("마스터는 최대 2명까지 지정할 수 있습니다.")
     if target["role"] == "master" and target["status"] == "approved" and (next_role != "master" or next_status != "approved") and master_count <= 1:
         raise ValueError("마지막 마스터의 권한을 내리거나 비활성화할 수 없습니다.")
     changes = {k: v for k, v in {"status": status, "role": role}.items() if v is not None}
     if status == "approved":
         changes.update({"approved_by": actor.id, "approved_at": datetime.now(timezone.utc).isoformat()})
+    elif status is not None:
+        changes.update({"approved_by": None, "approved_at": None})
     admin.table("profiles").update(changes).eq("id", target_id).execute()
     admin.table("audit_logs").insert({"actor_user_id": actor.id, "target_user_id": target_id, "action": "account_update", "details": changes}).execute()
 

@@ -23,7 +23,7 @@ def prepare_social_data(rows: Iterable[dict]) -> pd.DataFrame:
     frame["today"] = pd.to_numeric(frame["today"], errors="coerce").fillna(0).clip(lower=0).astype(int)
     frame["yesterday"] = pd.to_numeric(frame["yesterday"], errors="coerce").fillna(0).clip(lower=0).astype(int)
     frame = frame[frame["keyword"] != ""]
-    return frame
+    return frame.groupby("keyword", as_index=False, sort=False)[["today", "yesterday"]].sum()
 
 
 def best_product_match(keyword: str, products: Iterable[dict]) -> tuple[str, str, float]:
