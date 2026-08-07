@@ -8,12 +8,10 @@ from gspread.exceptions import WorksheetNotFound
 from components.config import google_service_account, google_sheet_id
 
 SHEET_HEADERS = {
-    "users": ["user_id", "email", "name", "status", "role", "created_at", "updated_at",
-              "approved_at", "approved_by", "last_login_at"],
     "settings": ["key", "value_json", "description", "updated_at", "updated_by"],
-    "analysis_results": ["result_id", "created_at", "created_by_email", "period_start", "period_end",
+    "analysis_results": ["result_id", "created_at", "created_by", "period_start", "period_end",
                          "metrics_json", "filters_json", "result_json"],
-    "audit_logs": ["log_id", "created_at", "actor_email", "action", "target_email", "details_json"],
+    "audit_logs": ["log_id", "created_at", "actor", "action", "target", "details_json"],
 }
 
 

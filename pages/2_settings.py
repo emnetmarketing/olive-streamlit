@@ -2,14 +2,14 @@ from datetime import date, time
 
 import streamlit as st
 
-from components.auth import require_approved
+from components.auth import require_auth
 from components.config import secret
 from services.settings_service import get_all_settings, save_setting
 from services.teams_service import send_teams_alert
 from services.google_sheets_service import connection_status
 
 st.set_page_config(page_title="모니터 설정", page_icon="⚙️", layout="wide")
-profile = require_approved()
+require_auth()
 
 st.title("모니터 설정")
 st.caption("일반 설정은 Google Sheets에 저장되어 모든 PC에서 복원됩니다. API Secret은 Streamlit Secrets에만 보관됩니다.")
@@ -37,10 +37,10 @@ with st.form("dashboard_settings"):
     alert_enabled = st.toggle("알림 사용", value=bool(dashboard["alert_enabled"]))
     alert_channel = st.selectbox("알림 채널", ["teams"], index=0,
                                  help="현재 Teams Workflow/Incoming Webhook 알림을 지원합니다.")
-    saved = st.form_submit_button("설정 저장", disabled=not profile.can_edit)
+    saved = st.form_submit_button("설정 저장")
 if saved:
     try:
-        save_setting(profile, "dashboard", {**dashboard, "surge_threshold": surge, "match_threshold": match,
+        save_setting("dashboard", {**dashboard, "surge_threshold": surge, "match_threshold": match,
                      "yesterday_max": yesterday, "collection_start": start.isoformat(), "collection_end": end.isoformat(),
                      "schedule_mode": schedule_mode, "schedule_times": [schedule_time.strftime("%H:%M")],
                      "alert_enabled": alert_enabled, "alert_channel": alert_channel})
@@ -53,10 +53,10 @@ with st.form("retention_settings"):
     c1, c2 = st.columns(2)
     days = c1.number_input("보관 기간(일)", min_value=1, max_value=3650, value=int(retention["days"]))
     max_records = c2.number_input("최대 저장 건수", min_value=10, max_value=100000, value=int(retention["max_records"]), step=10)
-    retention_saved = st.form_submit_button("보관 정책 저장", disabled=not profile.can_edit)
+    retention_saved = st.form_submit_button("보관 정책 저장")
 if retention_saved:
     try:
-        save_setting(profile, "retention", {"days": days, "max_records": max_records})
+        save_setting("retention", {"days": days, "max_records": max_records})
         st.success("보관 정책을 저장했습니다.")
     except Exception as exc:
         st.error(str(exc))
@@ -70,14 +70,14 @@ st.write({
     "Teams Webhook": "설정됨" if secret("TEAMS_WEBHOOK_URL") else "미설정",
 })
 
-if st.button("Google Sheets 연결 및 구조 확인", disabled=not profile.can_edit):
+if st.button("Google Sheets 연결 및 구조 확인"):
     try:
         counts = connection_status()
         st.success(f"연결 성공: {counts}")
     except Exception as exc:
         st.error(str(exc))
 
-if st.button("Teams 테스트 알림 보내기", disabled=not profile.can_edit):
+if st.button("Teams 테스트 알림 보내기"):
     try:
         send_teams_alert({"keywords": 1, "surges": 1, "matched": 1, "total_today": 1},
                          title="Olive Teams 연동 테스트")

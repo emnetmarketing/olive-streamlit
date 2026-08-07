@@ -1,8 +1,8 @@
 from copy import deepcopy
 from datetime import datetime, timezone
 from typing import Any
+from uuid import uuid4
 
-from models.schemas import UserProfile
 from services.google_sheets_service import append_record, find_record, json_text, parse_json, update_record
 
 DEFAULT_DASHBOARD_SETTINGS: dict[str, Any] = {
@@ -38,14 +38,16 @@ def get_setting(key: str) -> dict:
     return _validate(key, parse_json(found[1].get("value_json", ""), default)) if found else deepcopy(default)
 
 
-def save_setting(profile: UserProfile, key: str, value: dict) -> dict:
-    if not profile.can_edit:
-        raise PermissionError("설정 변경에는 master 또는 editor 권한이 필요합니다.")
+def save_setting(key: str, value: dict) -> dict:
     clean = _validate(key, value)
+    now = datetime.now(timezone.utc).isoformat()
     data = {"key": key, "value_json": json_text(clean), "description": DESCRIPTIONS[key],
-            "updated_at": datetime.now(timezone.utc).isoformat(), "updated_by": profile.email}
+            "updated_at": now, "updated_by": "shared_session"}
     found = find_record("settings", "key", key)
     update_record("settings", found[0], data) if found else append_record("settings", data)
+    append_record("audit_logs", {"log_id": str(uuid4()), "created_at": now, "actor": "shared_session",
+                                 "action": "settings_saved", "target": key,
+                                 "details_json": json_text({"key": key})})
     return clean
 
 

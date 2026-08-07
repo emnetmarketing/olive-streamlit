@@ -6,7 +6,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from components.auth import require_approved, restore_auth, sign_out
+from components.auth import require_auth, restore_auth, sign_out
 from components.auth_ui import render_login
 from components.styles import apply_styles
 from services.analysis_service import analyze_trends, summary_metrics
@@ -49,22 +49,18 @@ def trend_frame(results: list[dict]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-profile = restore_auth()
-if not profile:
+if not restore_auth():
     left, center, right = st.columns([1, 1.15, 1])
     with center:
         render_login()
     st.stop()
-profile = require_approved()
+require_auth()
 
 with st.sidebar:
     st.markdown("### NAVER TREND MONITOR")
-    st.write(profile.display_name or profile.email)
-    st.markdown(f'<span class="role-chip">{profile.role}</span>', unsafe_allow_html=True)
+    st.caption("공용 비밀번호 세션 · 12시간 유지")
     st.page_link("app.py", label="대시보드", icon="📈")
     st.page_link("pages/2_settings.py", label="설정", icon="⚙️")
-    if profile.is_master:
-        st.page_link("pages/3_user_management.py", label="권한 관리", icon="🔐")
     if st.button("로그아웃", use_container_width=True):
         sign_out()
         st.rerun()
@@ -222,7 +218,7 @@ if d3.button("결과 저장", use_container_width=True):
         payload = {"period": {"start": start_date.isoformat(), "end": end_date.isoformat()}, "metrics": metrics,
                    "filters": {"keyword": keyword_filter, "surge": surge_filter, "match": match_filter},
                    "rows": json.loads(filtered.to_json(orient="records", force_ascii=False))}
-        save_analysis_result(profile, payload)
+        save_analysis_result(payload)
         if settings.get("alert_enabled") and settings.get("alert_channel") == "teams":
             send_teams_alert(metrics)
         st.success("분석 결과를 Google Sheets에 저장했습니다.")
