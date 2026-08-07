@@ -6,17 +6,18 @@ from components.auth import require_approved
 from components.config import secret
 from services.settings_service import get_all_settings, save_setting
 from services.teams_service import send_teams_alert
+from services.google_sheets_service import connection_status
 
 st.set_page_config(page_title="모니터 설정", page_icon="⚙️", layout="wide")
 profile = require_approved()
 
 st.title("모니터 설정")
-st.caption("일반 설정은 Supabase에 저장되어 모든 PC에서 복원됩니다. API Secret은 Streamlit Secrets에만 보관됩니다.")
+st.caption("일반 설정은 Google Sheets에 저장되어 모든 PC에서 복원됩니다. API Secret은 Streamlit Secrets에만 보관됩니다.")
 
 try:
     settings = get_all_settings()
 except Exception:
-    st.error("Supabase 설정을 불러오지 못했습니다.")
+    st.error("Google Sheets 설정을 불러오지 못했습니다.")
     st.stop()
 
 dashboard = settings["dashboard"]
@@ -43,7 +44,7 @@ if saved:
                      "yesterday_max": yesterday, "collection_start": start.isoformat(), "collection_end": end.isoformat(),
                      "schedule_mode": schedule_mode, "schedule_times": [schedule_time.strftime("%H:%M")],
                      "alert_enabled": alert_enabled, "alert_channel": alert_channel})
-        st.success("Supabase에 설정을 저장했습니다.")
+        st.success("Google Sheets에 설정을 저장했습니다.")
     except Exception as exc:
         st.error(str(exc))
 
@@ -62,10 +63,19 @@ if retention_saved:
 
 st.subheader("서버 Secret 상태")
 st.write({
+    "Google Sheet ID": "설정됨" if secret("GOOGLE_SHEET_ID") else "미설정",
+    "Google 서비스 계정": "설정됨" if secret("gcp_service_account") else "미설정",
     "네이버 Client ID": "설정됨" if secret("NAVER_CLIENT_ID") else "미설정",
     "네이버 Client Secret": "설정됨" if secret("NAVER_CLIENT_SECRET") else "미설정",
     "Teams Webhook": "설정됨" if secret("TEAMS_WEBHOOK_URL") else "미설정",
 })
+
+if st.button("Google Sheets 연결 및 구조 확인", disabled=not profile.can_edit):
+    try:
+        counts = connection_status()
+        st.success(f"연결 성공: {counts}")
+    except Exception as exc:
+        st.error(str(exc))
 
 if st.button("Teams 테스트 알림 보내기", disabled=not profile.can_edit):
     try:

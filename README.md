@@ -1,78 +1,113 @@
 # Olive Streamlit
 
-소셜 키워드와 네이버 쇼핑·뉴스·DataLab 데이터를 결합해 급상승 키워드를 분석하는 Streamlit 전용 애플리케이션입니다. 기존 HTML/Netlify 프로젝트와 독립적으로 운영됩니다.
+소셜 키워드와 네이버 쇼핑·뉴스·DataLab 데이터를 결합해 급상승 키워드를 분석하는 Streamlit 앱입니다. 사용자·설정·분석 결과·실행 기록은 관리자가 직접 열어볼 수 있는 Google Sheets에 저장합니다.
 
-## 제공 기능
+## 중요: 간편 이메일 접속의 보안 범위
 
-- Supabase 이메일 회원가입·로그인과 가입 직후 `pending` 처리
-- 마스터 승인 후 대시보드 접근
+이 앱은 요청에 따라 비밀번호와 이메일 인증 없이 입력한 이메일을 `users` 시트에서 확인합니다. 따라서 이메일 주소를 아는 사람이 그 사용자인 것처럼 입력할 수 있습니다. 사내망, 제한된 Streamlit 배포, 신뢰할 수 있는 소규모 사용자 환경에만 사용하세요. 공개 인터넷 서비스에는 Google OAuth 같은 실제 본인 인증이 필요합니다.
+
+비밀번호는 수집하거나 저장하지 않습니다. 네이버 키, Teams Webhook, Google 서비스 계정 인증정보도 Google Sheets에 저장하지 않고 Streamlit Secrets에서만 읽습니다.
+
+## 기능
+
+- 미등록 이메일의 `pending/operator` 접근 요청 자동 등록
+- `approved` 사용자만 대시보드 접속
 - `master`, `editor`, `operator` 권한
-- 승인, 거절, 권한 변경, 비활성화, 계정 삭제, 감사 기록
-- 암호화된 브라우저 쿠키를 이용한 로그인 세션 복원
-- Supabase DB에 공용 설정과 분석 결과 저장
-- 네이버 쇼핑 검색, 뉴스 검색, 검색어 DataLab, 쇼핑인사이트 API
-- CSV/XLS/XLSX 업로드, 결과 필터, 차트, CSV/XLSX 다운로드
-- Teams Workflow 또는 Incoming Webhook 알림
-- Supabase RLS와 마스터 수 제한
+- 관리자 화면에서 승인·거절·비활성화·권한 변경
+- Google Sheet를 직접 열어 사용자와 설정 수정 가능
+- 설정, 분석 결과, 감사/실행 기록 저장
+- 네이버 쇼핑 검색, 뉴스, 검색어 DataLab, 쇼핑인사이트
+- CSV/XLS/XLSX 업로드, 필터, 차트, CSV/XLSX 다운로드
+- Teams 알림
 
-비밀번호는 애플리케이션 DB가 아닌 Supabase Auth에서 관리합니다. 네이버 Client ID/Secret, Supabase 키, Teams Webhook은 코드나 DB에 저장하지 않습니다.
+## 1. Google Sheet 만들기
 
-## 프로젝트 구조
+1. Google Drive에서 `새로 만들기` → `Google 스프레드시트`를 누릅니다.
+2. 파일 이름을 `olive-streamlit-data`로 지정합니다.
+3. 아래 이름으로 시트 탭 4개를 만듭니다.
+4. 각 시트의 1행에 아래 컬럼을 순서와 철자까지 동일하게 입력합니다.
+
+### `users`
 
 ```text
-app.py                         메인 대시보드
-pages/2_settings.py            분석·보관·알림 설정
-pages/3_user_management.py     사용자 및 권한 관리
-components/                    인증, 쿠키 세션, UI
-models/                        사용자 모델
-services/                      분석, Supabase, 네이버 API, Teams, 내보내기
-sql/supabase_schema.sql        테이블, 함수, 트리거, RLS
-tests/                         단위 테스트
+user_id | email | name | status | role | created_at | updated_at | approved_at | approved_by | last_login_at
 ```
 
-## 1. Python 준비
+- `status`: `pending`, `approved`, `rejected`, `disabled`
+- `role`: `master`, `editor`, `operator`
+- 첫 master는 `user_id`에 임의의 고유 문자열, 이메일과 이름을 입력하고 `status=approved`, `role=master`로 직접 추가할 수 있습니다.
 
-Python 3.11 이상을 권장합니다.
+### `settings`
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+```text
+key | value_json | description | updated_at | updated_by
 ```
 
-## 2. Supabase 준비
+처음에는 헤더만 있어도 됩니다. 앱 설정 화면에서 저장하면 `dashboard`, `retention` 행이 생성됩니다. `value_json`은 JSON이므로 따옴표와 쉼표를 유지하세요.
 
-1. Supabase에서 새 프로젝트를 만듭니다.
-2. SQL Editor에 `sql/supabase_schema.sql` 전체를 붙여 넣고 한 번 실행합니다.
-3. Authentication → Providers에서 Email 로그인을 활성화합니다.
-4. 이메일 확인을 사용할 경우 Authentication의 Site URL과 Redirect URL을 배포 주소에 맞춥니다.
-5. 앱에서 최초 관리자 계정으로 회원가입합니다.
-6. Table Editor의 `profiles`에서 사용자 UUID를 확인합니다.
-7. SQL Editor에서 최초 마스터를 승인합니다.
+### `analysis_results`
 
-```sql
-update public.profiles
-set role = 'master', status = 'approved', approved_at = now()
-where email = 'admin@example.com';
+```text
+result_id | created_at | created_by_email | period_start | period_end | metrics_json | filters_json | result_json
 ```
 
-마스터는 승인 상태로 최소 1명, 최대 2명입니다. 마지막 마스터의 강등·비활성화·삭제와 세 번째 마스터 승인은 DB 트리거가 차단합니다.
+### `audit_logs`
 
-## 3. Secrets 설정
+```text
+log_id | created_at | actor_email | action | target_email | details_json
+```
 
-예시 파일을 복사합니다.
+시트가 없으면 앱이 자동 생성할 수도 있지만, 직접 만들면 구조를 미리 확인하기 쉽습니다. 1행 컬럼이 다르면 앱은 데이터 손상을 막기 위해 오류를 표시합니다.
+
+스프레드시트 URL이 다음과 같다면 `/d/`와 `/edit` 사이가 `GOOGLE_SHEET_ID`입니다.
+
+```text
+https://docs.google.com/spreadsheets/d/GOOGLE_SHEET_ID/edit
+```
+
+## 2. Google Cloud 서비스 계정 만들기
+
+1. [Google Cloud Console](https://console.cloud.google.com/)에서 프로젝트를 새로 만들거나 선택합니다.
+2. `API 및 서비스` → `라이브러리`에서 `Google Sheets API`를 검색해 사용 설정합니다.
+3. `IAM 및 관리자` → `서비스 계정` → `서비스 계정 만들기`를 누릅니다.
+4. 이름을 `olive-streamlit`로 지정합니다. 프로젝트 역할은 별도로 부여하지 않아도 됩니다.
+5. 생성한 서비스 계정을 열고 `키` → `키 추가` → `새 키 만들기` → `JSON`을 선택합니다.
+6. 내려받은 JSON은 외부에 공유하거나 Git에 추가하지 마세요.
+7. JSON의 `client_email` 값을 복사합니다.
+8. 앞에서 만든 Google Sheet의 `공유`를 누르고 `client_email`을 편집자로 추가합니다.
+
+서비스 계정은 별도 Google 계정처럼 동작하므로 Sheet를 공유하기 전에는 접근할 수 없습니다.
+
+## 3. 로컬 Secrets 설정
 
 ```powershell
 Copy-Item .streamlit/secrets.toml.example .streamlit/secrets.toml
 ```
 
-다음 값을 입력합니다.
+JSON 파일의 각 값을 `.streamlit/secrets.toml`의 `[gcp_service_account]` 아래에 옮깁니다. `private_key`의 줄바꿈은 `\n` 형태를 유지합니다.
+
+필수 값:
 
 ```toml
-SUPABASE_URL = "https://PROJECT.supabase.co"
-SUPABASE_ANON_KEY = "..."
-SUPABASE_SERVICE_ROLE_KEY = "..."
+GOOGLE_SHEET_ID = "스프레드시트 ID"
+
+[gcp_service_account]
+type = "service_account"
+project_id = "..."
+private_key_id = "..."
+private_key = "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+client_email = "...@....iam.gserviceaccount.com"
+client_id = "..."
+auth_uri = "https://accounts.google.com/o/oauth2/auth"
+token_uri = "https://oauth2.googleapis.com/token"
+auth_provider_x509_cert_url = "https://www.googleapis.com/oauth2/v1/certs"
+client_x509_cert_url = "..."
+universe_domain = "googleapis.com"
+```
+
+추가 Secrets:
+
+```toml
 NAVER_CLIENT_ID = "..."
 NAVER_CLIENT_SECRET = "..."
 SESSION_ENCRYPTION_KEY = "..."
@@ -80,69 +115,68 @@ COOKIE_SECURE = false
 TEAMS_WEBHOOK_URL = "https://..."
 ```
 
-- Supabase URL과 키: Project Settings → API
-- 네이버 키: 네이버 개발자 센터에서 검색, DataLab 검색어 트렌드, DataLab 쇼핑인사이트 API를 등록
-- Service Role Key: 사용자 승인·삭제 같은 관리자 작업에만 서버에서 사용
-- `SESSION_ENCRYPTION_KEY`: 아래 명령으로 생성
+세션 암호화 키 생성:
 
 ```powershell
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
-로컬 HTTP에서는 `COOKIE_SECURE = false`, HTTPS 배포에서는 `true`를 사용합니다. 실제 `.streamlit/secrets.toml`은 `.gitignore`에 포함되어 있습니다.
+실제 `.streamlit/secrets.toml`은 Git에서 제외됩니다.
 
-## 4. Teams 알림 준비
-
-Teams 채널의 Workflows에서 “웹후크 요청을 받으면 채널에 게시” 유형의 Workflow를 만들고 생성된 HTTPS URL을 `TEAMS_WEBHOOK_URL`에 저장합니다. 업무 연속성을 위해 Workflow 공동 소유자를 지정하는 것을 권장합니다. 기존 Incoming Webhook URL도 Adaptive Card POST를 받는 경우 사용할 수 있습니다.
-
-설정 화면의 “Teams 테스트 알림 보내기”로 연결을 확인합니다. 분석 설정에서 알림을 활성화하면 결과 저장 시 Teams 알림도 전송됩니다.
-
-## 5. 실행
+## 4. Python 설치와 실행
 
 ```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
 python -m streamlit run app.py
 ```
 
-브라우저가 열리면 회원가입 → 마스터 승인 → 로그인 순서로 진행합니다.
+처음 로그인 화면에서 master 이메일과 이름을 입력합니다. 미등록 상태라면 `users`에 pending 행이 생깁니다. Sheet에서 해당 행을 `status=approved`, `role=master`로 바꾼 후 다시 접속합니다.
 
-## 6. 데이터 형식
+설정 화면의 `Google Sheets 연결 및 구조 확인` 버튼으로 4개 시트 연결을 검사할 수 있습니다.
 
-CSV/XLS/XLSX 파일에는 다음 열이 필요합니다.
-
-| 열 | 의미 |
-|---|---|
-| `keyword` | 분석 키워드 |
-| `today` | 오늘 언급량 |
-| `yesterday` | 전일 언급량 |
-
-같은 키워드가 여러 행이면 오늘/전일 언급량을 합산합니다.
-
-쇼핑인사이트에는 네이버 쇼핑 카테고리 URL의 `cat_id` 분야 코드를 입력해야 합니다. API 결과의 비율은 절대 클릭 수가 아니라 조회 범위 내 최대값을 100으로 둔 상대값입니다.
-
-## 7. 권한
+## 5. 권한
 
 | 기능 | master | editor | operator |
 |---|---:|---:|---:|
-| 대시보드/API/결과 조회 | 가능 | 가능 | 가능 |
-| 분석 결과 저장 | 가능 | 가능 | 가능 |
-| 공용 설정 변경 | 가능 | 가능 | 불가 |
-| 사용자 승인·권한·삭제 | 가능 | 불가 | 불가 |
+| 대시보드와 API | 가능 | 가능 | 가능 |
+| 결과 저장 | 가능 | 가능 | 가능 |
+| 설정 변경 | 가능 | 가능 | 불가 |
+| 사용자 승인·권한 관리 | 가능 | 불가 | 불가 |
 
-## 8. 테스트
+승인된 master는 최소 1명, 최대 2명으로 앱에서 검사합니다. Google Sheet를 직접 수정하면 이 검사를 우회할 수 있으므로 마지막 master를 삭제하거나 master를 3명 이상 승인하지 마세요.
+
+## 6. 네이버와 Teams
+
+네이버 개발자 센터에서 검색, DataLab 검색어 트렌드, DataLab 쇼핑인사이트 API를 등록하고 Client ID/Secret을 Secrets에 넣습니다. Teams 채널의 Workflows에서 Webhook 요청을 받는 Workflow를 만든 뒤 URL을 `TEAMS_WEBHOOK_URL`에 넣습니다.
+
+## 7. 테스트
 
 ```powershell
 python -m unittest discover -s tests -v
 python -m compileall -q app.py components models pages services tests
 ```
 
-실제 Supabase·네이버·Teams 통합 테스트에는 배포 환경의 자격 증명이 필요합니다. 단위 테스트는 외부 요청을 모킹하며 자격 증명을 출력하지 않습니다.
+단위 테스트는 Google API와 외부 HTTP 호출을 모킹합니다. 실제 연동은 설정 화면의 Sheets 연결 버튼, 네이버 조회, Teams 테스트 알림으로 확인합니다.
 
-## 9. Streamlit Community Cloud 배포
+## 8. Streamlit Community Cloud
 
-1. 이 GitHub 저장소로 새 Streamlit 앱을 만듭니다.
-2. Main file path를 `app.py`로 지정합니다.
-3. Advanced settings → Secrets에 `.streamlit/secrets.toml.example` 형식으로 실제 값을 등록합니다.
-4. `COOKIE_SECURE = true`로 설정합니다.
-5. 배포 후 회원가입, 승인, API 조회, 결과 저장, Teams 테스트를 순서대로 확인합니다.
+1. 이 GitHub 저장소로 앱을 만들고 Main file path를 `app.py`로 지정합니다.
+2. Advanced settings → Secrets에 로컬 `secrets.toml` 내용을 붙여넣습니다.
+3. `COOKIE_SECURE = true`로 변경합니다.
+4. 서비스 계정 이메일이 Google Sheet 편집자로 공유되어 있는지 확인합니다.
+5. 배포 후 이메일 접속, 설정 저장, 결과 저장, 네이버 API, Teams 알림을 확인합니다.
 
-Secrets 값을 바꾸면 기존 로그인 쿠키가 무효화될 수 있습니다. 특히 `SESSION_ENCRYPTION_KEY` 변경 후에는 사용자가 다시 로그인해야 합니다.
+## 저장소 구조
+
+```text
+app.py
+components/                    이메일 접속, 암호화 쿠키, UI
+models/                        사용자 모델
+pages/                         설정, 사용자 관리
+services/google_sheets_service.py
+services/                      분석, 네이버, Teams, 내보내기
+tests/
+```

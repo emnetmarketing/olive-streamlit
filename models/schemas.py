@@ -16,9 +16,9 @@ class UserProfile:
     @classmethod
     def from_record(cls, data: dict) -> "UserProfile":
         return cls(
-            id=str(data["id"]),
+            id=str(data.get("user_id") or data.get("id") or data.get("email", "")),
             email=str(data.get("email", "")),
-            display_name=str(data.get("display_name", "")),
+            display_name=str(data.get("name") or data.get("display_name", "")),
             role=data.get("role", "operator"),
             status=data.get("status", "pending"),
         )

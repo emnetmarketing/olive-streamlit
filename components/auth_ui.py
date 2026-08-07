@@ -1,38 +1,24 @@
 import streamlit as st
 
-from components.auth import sign_in, sign_up
+from components.auth import sign_in
 
 
 def render_login() -> None:
     st.markdown("## 네쇼검 트렌드 모니터")
-    st.caption("Supabase 보안 로그인")
-    login_tab, signup_tab = st.tabs(["로그인", "접근 신청"])
-    with login_tab:
-        with st.form("login_form"):
-            email = st.text_input("이메일", key="login_email")
-            password = st.text_input("비밀번호", type="password", key="login_password")
-            submitted = st.form_submit_button("로그인", use_container_width=True)
-        if submitted:
-            try:
-                profile = sign_in(email, password)
-                if profile.approved:
-                    st.rerun()
-                else:
-                    st.warning("계정 승인이 아직 완료되지 않았습니다.")
-            except Exception:
-                st.error("로그인에 실패했습니다. 계정 정보 또는 승인 상태를 확인하세요.")
-    with signup_tab:
-        with st.form("signup_form"):
-            name = st.text_input("이름")
-            email = st.text_input("이메일", key="signup_email")
-            password = st.text_input("비밀번호 (8자 이상)", type="password", key="signup_password")
-            password_confirm = st.text_input("비밀번호 확인", type="password")
-            submitted = st.form_submit_button("접근 신청", use_container_width=True)
-        if submitted:
-            if len(password) < 8 or password != password_confirm:
-                st.error("8자 이상의 동일한 비밀번호를 입력하세요.")
-            else:
-                try:
-                    st.success(sign_up(email, password, name))
-                except Exception:
-                    st.error("가입 신청에 실패했습니다. 이미 등록된 이메일인지 확인하세요.")
+    st.caption("승인된 이메일로 접속")
+    st.warning("이 로그인은 비밀번호나 이메일 소유권 확인이 없는 사내 간편 접속 방식입니다. 공개 서비스에는 사용하지 마세요.")
+    with st.form("email_login_form"):
+        email = st.text_input("이메일", placeholder="name@company.com")
+        name = st.text_input("이름", help="처음 접근을 요청할 때 users 시트에 저장됩니다.")
+        submitted = st.form_submit_button("접속 또는 승인 요청", use_container_width=True)
+    if submitted:
+        try:
+            profile = sign_in(email, name)
+            if profile.approved:
+                st.success("접속이 승인되었습니다.")
+                st.rerun()
+            messages = {"pending": "승인 대기 중입니다. master가 users 시트 또는 관리자 화면에서 승인해야 합니다.",
+                        "rejected": "접근 요청이 거절되었습니다.", "disabled": "비활성화된 사용자입니다."}
+            st.warning(messages.get(profile.status, "현재 접근할 수 없습니다."))
+        except Exception as exc:
+            st.error(str(exc))

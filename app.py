@@ -76,7 +76,7 @@ st.markdown('<p class="olive-subtitle">소셜 급상승 키워드와 네이버 �
 try:
     settings = get_setting("dashboard")
 except Exception:
-    st.error("공용 설정을 불러오지 못했습니다. Supabase 연결과 RLS 설정을 확인하세요.")
+    st.error("공용 설정을 불러오지 못했습니다. Google Sheets 공유 권한과 Secrets를 확인하세요.")
     st.stop()
 
 SAMPLE_SOCIAL = [
@@ -225,7 +225,7 @@ if d3.button("결과 저장", use_container_width=True):
         save_analysis_result(profile, payload)
         if settings.get("alert_enabled") and settings.get("alert_channel") == "teams":
             send_teams_alert(metrics)
-        st.success("분석 결과를 Supabase에 저장했습니다.")
+        st.success("분석 결과를 Google Sheets에 저장했습니다.")
     except Exception as exc:
         st.error(f"결과 저장 또는 알림 전송에 실패했습니다: {exc}")
 if d4.button("Teams 알림", use_container_width=True):

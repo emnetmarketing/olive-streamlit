@@ -19,46 +19,49 @@ except Exception:
     st.stop()
 
 for user in profiles:
+    user_id = user.get("user_id") or user.get("email", "")
+    current_status = user.get("status") if user.get("status") in {"pending", "approved", "rejected", "disabled"} else "pending"
+    current_role = user.get("role") if user.get("role") in {"operator", "editor", "master"} else "operator"
     with st.container(border=True):
         info, status_col, role_col, action_col = st.columns([3, 1.5, 1.5, 2])
-        info.markdown(f"**{user.get('display_name') or '이름 미지정'}**")
+        info.markdown(f"**{user.get('name') or '이름 미지정'}**")
         info.caption(user.get("email", ""))
         new_status = status_col.selectbox("상태", ["pending", "approved", "rejected", "disabled"],
-                                          index=["pending", "approved", "rejected", "disabled"].index(user["status"]), key=f"status_{user['id']}")
+                                          index=["pending", "approved", "rejected", "disabled"].index(current_status), key=f"status_{user_id}")
         new_role = role_col.selectbox("권한", ["operator", "editor", "master"],
-                                      index=["operator", "editor", "master"].index(user["role"]), key=f"role_{user['id']}")
-        if action_col.button("변경 저장", key=f"save_{user['id']}", use_container_width=True):
+                                      index=["operator", "editor", "master"].index(current_role), key=f"role_{user_id}")
+        if action_col.button("변경 저장", key=f"save_{user_id}", use_container_width=True):
             try:
-                update_account(actor, user["id"], status=new_status, role=new_role)
+                update_account(actor, user_id, status=new_status, role=new_role)
                 st.success("변경했습니다."); st.rerun()
             except Exception as exc:
                 st.error(str(exc))
         quick1, quick2, quick3 = st.columns(3)
-        if user["status"] == "pending" and quick1.button("승인", key=f"approve_{user['id']}", use_container_width=True):
+        if current_status == "pending" and quick1.button("승인", key=f"approve_{user_id}", use_container_width=True):
             try:
-                update_account(actor, user["id"], status="approved")
+                update_account(actor, user_id, status="approved")
                 st.success("승인했습니다.")
                 st.rerun()
             except Exception as exc:
                 st.error(str(exc))
-        if user["status"] == "pending" and quick2.button("거절", key=f"reject_{user['id']}", use_container_width=True):
+        if current_status == "pending" and quick2.button("거절", key=f"reject_{user_id}", use_container_width=True):
             try:
-                update_account(actor, user["id"], status="rejected")
+                update_account(actor, user_id, status="rejected")
                 st.success("거절했습니다.")
                 st.rerun()
             except Exception as exc:
                 st.error(str(exc))
-        if user["id"] != actor.id and user["status"] == "approved" and quick3.button(
-                "비활성화", key=f"disable_{user['id']}", use_container_width=True):
+        if user_id != actor.id and current_status == "approved" and quick3.button(
+                "비활성화", key=f"disable_{user_id}", use_container_width=True):
             try:
-                update_account(actor, user["id"], status="disabled")
+                update_account(actor, user_id, status="disabled")
                 st.success("비활성화했습니다.")
                 st.rerun()
             except Exception as exc:
                 st.error(str(exc))
-        if user["id"] != actor.id and action_col.button("계정 삭제", key=f"delete_{user['id']}", use_container_width=True):
+        if user_id != actor.id and action_col.button("사용자 행 삭제", key=f"delete_{user_id}", use_container_width=True):
             try:
-                delete_account(actor, user["id"])
+                delete_account(actor, user_id)
                 st.success("삭제했습니다."); st.rerun()
             except Exception as exc:
                 st.error(str(exc))
