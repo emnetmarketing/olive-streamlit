@@ -11,6 +11,7 @@ from components.auth_ui import render_login
 from components.styles import apply_styles
 from services.analysis_service import analyze_trends, summary_metrics
 from services.export_service import dataframe_to_xlsx
+from services.google_sheets_service import ensure_schema
 from services.naver_datalab_service import search_trends
 from services.naver_news_service import search_news
 from services.naver_shopping_insight_service import keyword_trends
@@ -55,6 +56,13 @@ if not restore_auth():
         render_login()
     st.stop()
 require_auth()
+
+try:
+    ensure_schema()
+except Exception as exc:
+    st.error(f"Google Sheets 초기 연결에 실패했습니다: {exc}")
+    st.info("Google Sheets API 활성화, 서비스 계정 편집자 공유, Secrets의 인증정보를 확인하세요.")
+    st.stop()
 
 with st.sidebar:
     st.markdown("### NAVER TREND MONITOR")

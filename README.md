@@ -16,6 +16,20 @@
 
 ## Google Sheets 구조
 
+이 프로젝트의 Google Sheet:
+
+```text
+https://docs.google.com/spreadsheets/d/1u3NE0rDElnhfYZ2sv2iLy22juLa2z5fBR5xmUgKznBo/edit
+```
+
+Sheet ID:
+
+```text
+1u3NE0rDElnhfYZ2sv2iLy22juLa2z5fBR5xmUgKznBo
+```
+
+탭과 헤더를 직접 만들 필요는 없습니다. 서비스 계정 연결 후 처음 로그인하면 앱이 아래 탭 3개와 1행 헤더를 자동으로 생성합니다. 이미 같은 이름의 탭이 있으면 삭제하거나 초기화하지 않으며 기존 데이터를 유지합니다. 기존 탭의 1행 헤더가 예상 구조와 다르면 데이터 보호를 위해 자동 변경하지 않고 오류를 표시합니다.
+
 Google 스프레드시트에 아래 탭 3개를 만듭니다. 각 탭의 1행에 컬럼을 순서와 철자까지 동일하게 입력하세요.
 
 ### `settings`
@@ -38,7 +52,7 @@ log_id | created_at | actor | action | target | details_json
 
 공용 로그인 구조에서는 실행 주체가 `shared_session`으로 기록됩니다. 비밀번호는 어떤 시트에도 기록되지 않습니다.
 
-시트 탭이 없으면 앱이 자동 생성할 수 있습니다. 하지만 직접 만들면 구조를 확인하기 쉽습니다. 기존에 `users` 탭이 있다면 앱은 읽거나 수정하지 않으므로 필요에 따라 직접 삭제할 수 있습니다.
+기존에 `users` 탭이 있다면 앱은 읽거나 수정하지 않으므로 필요에 따라 직접 삭제할 수 있습니다.
 
 ## 1. Google Cloud와 서비스 계정
 
@@ -61,7 +75,7 @@ Copy-Item .streamlit/secrets.toml.example .streamlit/secrets.toml
 `.streamlit/secrets.toml` 예시:
 
 ```toml
-GOOGLE_SHEET_ID = "Google Sheet URL의 /d/와 /edit 사이 값"
+GOOGLE_SHEET_ID = "1u3NE0rDElnhfYZ2sv2iLy22juLa2z5fBR5xmUgKznBo"
 APP_PASSWORD = "직접 정한 강력한 공용 비밀번호"
 
 [gcp_service_account]
