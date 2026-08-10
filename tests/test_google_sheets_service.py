@@ -1,4 +1,6 @@
+import json
 import unittest
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 from services.google_sheets_service import (GoogleSheetsAPIError, SHEET_HEADERS, append_record, ensure_schema,
@@ -8,6 +10,17 @@ WEB_APP_URL = "https://script.google.com/macros/s/test-deployment/exec"
 
 
 class GoogleSheetsServiceTest(unittest.TestCase):
+    def test_apps_script_manifest_uses_only_required_sheets_scope(self):
+        project_root = Path(__file__).resolve().parents[1]
+        manifest = json.loads((project_root / "google_apps_script" / "appsscript.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["oauthScopes"], ["https://www.googleapis.com/auth/spreadsheets"])
+
+    def test_apps_script_does_not_use_unneeded_google_services(self):
+        project_root = Path(__file__).resolve().parents[1]
+        source = (project_root / "google_apps_script" / "Code.gs").read_text(encoding="utf-8")
+        for service in ("DriveApp", "GmailApp", "UrlFetchApp", "DocumentApp", "FormApp", "SlidesApp"):
+            self.assertNotIn(service, source)
+
     def test_schema_has_three_data_sheets(self):
         self.assertEqual(set(SHEET_HEADERS), {"settings", "analysis_results", "audit_logs"})
         self.assertIn("value_json", SHEET_HEADERS["settings"])

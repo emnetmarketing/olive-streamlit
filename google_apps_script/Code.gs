@@ -1,4 +1,10 @@
-/** Olive Streamlit - Google Sheets Web App storage */
+/**
+ * Olive Streamlit - Google Sheets Web App storage
+ *
+ * OAuth is explicitly limited in appsscript.json to the single Sheets
+ * read/write scope. @OnlyCurrentDoc is intentionally not used: Apps Script
+ * does not expose the bound spreadsheet as the active document in Web Apps.
+ */
 const SPREADSHEET_ID = '1u3NE0rDElnhfYZ2sv2iLy22juLa2z5fBR5xmUgKznBo';
 
 const SHEET_HEADERS = Object.freeze({

@@ -51,6 +51,22 @@ log_id | created_at | actor | action | target | details_json
 
 `Code.gs`에는 공개 식별자인 Sheet ID만 포함되며 비밀번호, 네이버 키, Teams URL 같은 민감정보는 없습니다.
 
+### 최소 OAuth 권한 설정
+
+이 Web App은 `SpreadsheetApp.openById()`로 지정된 Sheet를 읽고 써야 하므로 다음 Sheets 읽기/쓰기 scope 하나만 사용합니다.
+
+```text
+https://www.googleapis.com/auth/spreadsheets
+```
+
+Drive, Gmail, 외부 URL 요청 권한은 사용하지 않습니다. `@OnlyCurrentDoc`와 `spreadsheets.currentonly`는 더 좁은 권한이지만, Google 공식 문서상 바운드 스크립트가 Web App으로 실행될 때 `getActiveSpreadsheet()`를 사용할 수 없으므로 이 구조에는 적용할 수 없습니다.
+
+1. Apps Script 왼쪽에서 `프로젝트 설정`을 누릅니다.
+2. `편집기에 appsscript.json 매니페스트 파일 표시`를 켭니다.
+3. 왼쪽 `편집기`로 돌아가 `appsscript.json`을 누릅니다.
+4. 저장소의 `google_apps_script/appsscript.json` 전체 내용을 복사해 기존 내용을 교체하고 저장합니다.
+5. 왼쪽 `개요`의 `프로젝트 OAuth 범위`에는 Google Sheets 범위 하나만 표시되는지 확인합니다.
+
 ## 2. Web App 배포
 
 1. Apps Script 화면 오른쪽 위 `배포` → `새 배포`를 누릅니다.
@@ -61,6 +77,10 @@ log_id | created_at | actor | action | target | details_json
 6. `배포`를 누릅니다.
 7. 권한 승인 화면이 나오면 본인 Google 계정을 선택하고 Sheet 접근 권한을 허용합니다.
 8. 표시되는 `웹 앱 URL`을 복사합니다. URL은 `/exec`로 끝나야 합니다.
+
+배포 전에 편집기 상단의 함수 선택 메뉴에서 `doGet`을 선택하고 `실행`을 한 번 누르면 소유자 권한 승인 화면을 먼저 완료할 수 있습니다. 이 승인은 Apps Script 소유자 본인에게만 필요하며, `다음 사용자로 실행: 나`로 배포한 Web App 방문자에게 Google 로그인을 요구하지 않습니다.
+
+`This app is blocked`가 계속 표시되면 기존 배포를 재사용하지 말고, 매니페스트 저장 후 `배포` → `배포 관리`에서 기존 배포를 보관처리한 다음 `새 배포`를 만드세요. Google 계정의 보안 설정에서 이 스크립트의 과거 연결을 삭제한 뒤 `doGet`을 다시 실행하면 오래된 광범위 권한 동의를 새 최소 범위로 다시 요청할 수 있습니다.
 
 `/dev`로 끝나는 테스트 URL은 사용하지 마세요. Apps Script Content Service 응답은 Google의 일회용 URL로 리디렉션되며 Streamlit 코드는 이 리디렉션을 자동으로 따라갑니다.
 
