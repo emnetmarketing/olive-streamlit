@@ -18,6 +18,12 @@ class SettingsAndAuthTest(unittest.TestCase):
         self.assertEqual(settings["yesterday_max"], 0)
         self.assertEqual(settings["schedule_times"], ["09:00"])
 
+    def test_retention_is_bounded(self):
+        self.assertEqual(_validate("retention", {"days": 0, "max_records": 1}),
+                         {"days": 1, "max_records": 10})
+        self.assertEqual(_validate("retention", {"days": 99999, "max_records": 999999}),
+                         {"days": 3650, "max_records": 100000})
+
     def test_environment_boolean(self):
         os.environ["TEST_COOKIE_FLAG"] = "false"
         self.assertFalse(secret_bool("TEST_COOKIE_FLAG", True))

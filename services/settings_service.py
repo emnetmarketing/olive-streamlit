@@ -6,10 +6,14 @@ DEFAULT_DASHBOARD_SETTINGS: dict[str, Any] = {
     "collection_start": None, "collection_end": None, "schedule_mode": "daily",
     "schedule_times": ["09:00"], "alert_enabled": False, "alert_channel": "teams",
 }
-ALLOWED_KEYS = {"dashboard"}
+DEFAULT_RETENTION = {"days": 90, "max_records": 1000}
+ALLOWED_KEYS = {"dashboard", "retention"}
 
 
 def _validate(key: str, value: dict) -> dict:
+    if key == "retention":
+        return {"days": max(1, min(int(value.get("days", 90)), 3650)),
+                "max_records": max(10, min(int(value.get("max_records", 1000)), 100000))}
     if key == "dashboard":
         clean = {item: value.get(item, default) for item, default in DEFAULT_DASHBOARD_SETTINGS.items()}
         clean["surge_threshold"] = max(1, int(clean["surge_threshold"]))
@@ -27,7 +31,8 @@ def get_setting(key: str) -> dict:
     import streamlit as st
 
     stored = st.session_state.get(f"setting_{key}")
-    return _validate(key, stored) if isinstance(stored, dict) else deepcopy(DEFAULT_DASHBOARD_SETTINGS)
+    default = DEFAULT_RETENTION if key == "retention" else DEFAULT_DASHBOARD_SETTINGS
+    return _validate(key, stored) if isinstance(stored, dict) else deepcopy(default)
 
 
 def save_setting(key: str, value: dict) -> dict:
@@ -36,3 +41,7 @@ def save_setting(key: str, value: dict) -> dict:
     clean = _validate(key, value)
     st.session_state[f"setting_{key}"] = clean
     return clean
+
+
+def get_all_settings() -> dict[str, dict]:
+    return {key: get_setting(key) for key in ALLOWED_KEYS}

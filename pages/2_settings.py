@@ -4,7 +4,7 @@ import streamlit as st
 
 from components.auth import require_auth
 from components.config import secret
-from services.settings_service import get_setting, save_setting
+from services.settings_service import get_all_settings, save_setting
 from services.teams_service import send_teams_alert
 
 st.set_page_config(page_title="모니터 설정", page_icon="⚙️", layout="wide")
@@ -13,7 +13,9 @@ require_auth()
 st.title("모니터 설정")
 st.caption("일반 설정은 현재 로그인 세션에 적용됩니다. API 인증정보는 Streamlit Secrets에서만 관리됩니다.")
 
-dashboard = get_setting("dashboard")
+settings = get_all_settings()
+dashboard = settings["dashboard"]
+retention = settings["retention"]
 with st.form("dashboard_settings"):
     st.subheader("분석 기준")
     c1, c2, c3 = st.columns(3)
@@ -37,6 +39,20 @@ if saved:
                      "schedule_mode": schedule_mode, "schedule_times": [schedule_time.strftime("%H:%M")],
                      "alert_enabled": alert_enabled, "alert_channel": alert_channel})
         st.success("현재 세션에 설정을 적용했습니다.")
+    except Exception as exc:
+        st.error(str(exc))
+
+with st.form("retention_settings"):
+    st.subheader("분석 결과 보관")
+    c1, c2 = st.columns(2)
+    days = c1.number_input("보관 기간(일)", min_value=1, max_value=3650, value=int(retention["days"]))
+    max_records = c2.number_input("최대 저장 건수", min_value=10, max_value=100000,
+                                  value=int(retention["max_records"]), step=10)
+    retention_saved = st.form_submit_button("보관 정책 저장")
+if retention_saved:
+    try:
+        save_setting("retention", {"days": days, "max_records": max_records})
+        st.success("현재 세션에 보관 정책을 적용했습니다.")
     except Exception as exc:
         st.error(str(exc))
 
