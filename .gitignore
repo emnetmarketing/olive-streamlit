@@ -31,3 +31,6 @@ Thumbs.db
 
 # Project-local tooling
 .codex-ssh/
+
+# Removed integrations and local editor leftovers
+google_apps_script/

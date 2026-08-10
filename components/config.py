@@ -14,10 +14,6 @@ def secret(name: str, default: Any = None, required: bool = False) -> Any:
     return value
 
 
-def google_apps_script_url() -> str:
-    return str(secret("GOOGLE_APPS_SCRIPT_URL", required=True)).strip()
-
-
 def secret_bool(name: str, default: bool = False) -> bool:
     value = secret(name, default)
     if isinstance(value, bool):

@@ -4,24 +4,16 @@ import streamlit as st
 
 from components.auth import require_auth
 from components.config import secret
-from services.settings_service import get_all_settings, save_setting
+from services.settings_service import get_setting, save_setting
 from services.teams_service import send_teams_alert
-from services.google_sheets_service import connection_status
 
 st.set_page_config(page_title="모니터 설정", page_icon="⚙️", layout="wide")
 require_auth()
 
 st.title("모니터 설정")
-st.caption("일반 설정은 Google Sheets에 저장되어 모든 PC에서 복원됩니다. API Secret은 Streamlit Secrets에만 보관됩니다.")
+st.caption("일반 설정은 현재 로그인 세션에 적용됩니다. API 인증정보는 Streamlit Secrets에서만 관리됩니다.")
 
-try:
-    settings = get_all_settings()
-except Exception:
-    st.error("Google Sheets 설정을 불러오지 못했습니다.")
-    st.stop()
-
-dashboard = settings["dashboard"]
-retention = settings["retention"]
+dashboard = get_setting("dashboard")
 with st.form("dashboard_settings"):
     st.subheader("분석 기준")
     c1, c2, c3 = st.columns(3)
@@ -44,37 +36,15 @@ if saved:
                      "yesterday_max": yesterday, "collection_start": start.isoformat(), "collection_end": end.isoformat(),
                      "schedule_mode": schedule_mode, "schedule_times": [schedule_time.strftime("%H:%M")],
                      "alert_enabled": alert_enabled, "alert_channel": alert_channel})
-        st.success("Google Sheets에 설정을 저장했습니다.")
-    except Exception as exc:
-        st.error(str(exc))
-
-with st.form("retention_settings"):
-    st.subheader("분석 결과 보관")
-    c1, c2 = st.columns(2)
-    days = c1.number_input("보관 기간(일)", min_value=1, max_value=3650, value=int(retention["days"]))
-    max_records = c2.number_input("최대 저장 건수", min_value=10, max_value=100000, value=int(retention["max_records"]), step=10)
-    retention_saved = st.form_submit_button("보관 정책 저장")
-if retention_saved:
-    try:
-        save_setting("retention", {"days": days, "max_records": max_records})
-        st.success("보관 정책을 저장했습니다.")
+        st.success("현재 세션에 설정을 적용했습니다.")
     except Exception as exc:
         st.error(str(exc))
 
 st.subheader("서버 Secret 상태")
 st.write({
-    "Google Apps Script URL": "설정됨" if secret("GOOGLE_APPS_SCRIPT_URL") else "미설정",
-    "네이버 Client ID": "설정됨" if secret("NAVER_CLIENT_ID") else "미설정",
-    "네이버 Client Secret": "설정됨" if secret("NAVER_CLIENT_SECRET") else "미설정",
-    "Teams Webhook": "설정됨" if secret("TEAMS_WEBHOOK_URL") else "미설정",
+    "네이버 API": "연결됨" if secret("NAVER_CLIENT_ID") and secret("NAVER_CLIENT_SECRET") else "미설정",
+    "Teams": "연결됨" if secret("TEAMS_WEBHOOK_URL") else "미설정",
 })
-
-if st.button("Google Sheets 연결 및 구조 확인"):
-    try:
-        counts = connection_status()
-        st.success(f"연결 성공: {counts}")
-    except Exception as exc:
-        st.error(str(exc))
 
 if st.button("Teams 테스트 알림 보내기"):
     try:

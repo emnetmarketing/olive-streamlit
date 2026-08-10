@@ -1,4 +1,3 @@
-import json
 from datetime import date, timedelta
 from io import BytesIO
 
@@ -11,12 +10,10 @@ from components.auth_ui import render_login
 from components.styles import apply_styles
 from services.analysis_service import analyze_trends, summary_metrics
 from services.export_service import dataframe_to_xlsx
-from services.google_sheets_service import ensure_schema
 from services.naver_datalab_service import search_trends
 from services.naver_news_service import search_news
 from services.naver_shopping_insight_service import keyword_trends
 from services.naver_shopping_service import search_shopping
-from services.results_service import recent_results, save_analysis_result
 from services.settings_service import get_setting
 from services.teams_service import send_teams_alert
 
@@ -57,13 +54,6 @@ if not restore_auth():
     st.stop()
 require_auth()
 
-try:
-    ensure_schema()
-except Exception as exc:
-    st.error(f"Google Sheets 초기 연결에 실패했습니다: {exc}")
-    st.info("Apps Script Web App 배포 권한과 Secrets의 GOOGLE_APPS_SCRIPT_URL을 확인하세요.")
-    st.stop()
-
 with st.sidebar:
     st.markdown("### NAVER TREND MONITOR")
     st.caption("공용 비밀번호 세션 · 12시간 유지")
@@ -77,11 +67,7 @@ st.markdown('<p class="olive-title">네쇼검 트렌드 모니터</p>', unsafe_a
 st.markdown('<p class="olive-subtitle">소셜 급상승 키워드와 네이버 쇼핑·뉴스·DataLab 데이터를 한 화면에서 분석합니다.</p>',
             unsafe_allow_html=True)
 
-try:
-    settings = get_setting("dashboard")
-except Exception:
-    st.error("공용 설정을 불러오지 못했습니다. Google Sheets 공유 권한과 Secrets를 확인하세요.")
-    st.stop()
+settings = get_setting("dashboard")
 
 SAMPLE_SOCIAL = [
     {"keyword": "아크멜로 비타 세럼", "today": 12840, "yesterday": 94},
@@ -217,39 +203,25 @@ with table_col:
 
 csv_data = filtered.to_csv(index=False).encode("utf-8-sig")
 xlsx_data = dataframe_to_xlsx(filtered)
-d1, d2, d3, d4, d5 = st.columns(5)
+d1, d2, d3, d4 = st.columns(4)
 d1.download_button("CSV 다운로드", csv_data, "naver_trend_results.csv", "text/csv", use_container_width=True)
 d2.download_button("XLSX 다운로드", xlsx_data, "naver_trend_results.xlsx",
                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
-if d3.button("결과 저장", use_container_width=True):
+if d3.button("분석 완료", use_container_width=True):
     try:
-        payload = {"period": {"start": start_date.isoformat(), "end": end_date.isoformat()}, "metrics": metrics,
-                   "filters": {"keyword": keyword_filter, "surge": surge_filter, "match": match_filter},
-                   "rows": json.loads(filtered.to_json(orient="records", force_ascii=False))}
-        save_analysis_result(payload)
         if settings.get("alert_enabled") and settings.get("alert_channel") == "teams":
             send_teams_alert(metrics)
-        st.success("분석 결과를 Google Sheets에 저장했습니다.")
+            st.success("분석을 완료하고 Teams 자동 알림을 전송했습니다.")
+        else:
+            st.success("분석을 완료했습니다. 결과는 CSV 또는 XLSX로 내려받을 수 있습니다.")
     except Exception as exc:
-        st.error(f"결과 저장 또는 알림 전송에 실패했습니다: {exc}")
+        st.error(f"Teams 자동 알림 전송에 실패했습니다: {exc}")
 if d4.button("Teams 알림", use_container_width=True):
     try:
         send_teams_alert(metrics)
         st.success("Teams 알림을 전송했습니다.")
     except Exception as exc:
         st.error(str(exc))
-if d5.button("최근 결과", use_container_width=True):
-    try:
-        st.session_state.recent_results = recent_results()
-    except Exception as exc:
-        st.error(f"최근 결과를 불러오지 못했습니다: {exc}")
-
-if st.session_state.get("recent_results"):
-    with st.expander("최근 저장 기록", expanded=True):
-        history_rows = [{"저장 시각": item["created_at"], **item["result_data"].get("metrics", {})}
-                        for item in st.session_state.recent_results]
-        st.dataframe(pd.DataFrame(history_rows), use_container_width=True, hide_index=True)
-
 if st.session_state.get("news_items"):
     with st.expander("뉴스 결과"):
         news_frame = pd.DataFrame(st.session_state.news_items)
