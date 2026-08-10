@@ -61,7 +61,7 @@ try:
     ensure_schema()
 except Exception as exc:
     st.error(f"Google Sheets 초기 연결에 실패했습니다: {exc}")
-    st.info("Google Sheets API 활성화, 서비스 계정 편집자 공유, Secrets의 인증정보를 확인하세요.")
+    st.info("Apps Script Web App 배포 권한과 Secrets의 GOOGLE_APPS_SCRIPT_URL을 확인하세요.")
     st.stop()
 
 with st.sidebar:

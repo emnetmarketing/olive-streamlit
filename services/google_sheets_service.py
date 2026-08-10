@@ -1,11 +1,10 @@
 import json
-from functools import lru_cache
 from typing import Any
+from urllib.parse import urlparse
 
-import gspread
-from gspread.exceptions import WorksheetNotFound
+import httpx
 
-from components.config import google_service_account, google_sheet_id
+from components.config import google_apps_script_url
 
 SHEET_HEADERS = {
     "settings": ["key", "value_json", "description", "updated_at", "updated_by"],
@@ -13,6 +12,11 @@ SHEET_HEADERS = {
                          "metrics_json", "filters_json", "result_json"],
     "audit_logs": ["log_id", "created_at", "actor", "action", "target", "details_json"],
 }
+TIMEOUT_SECONDS = 30
+
+
+class GoogleSheetsAPIError(RuntimeError):
+    pass
 
 
 def json_text(value: Any) -> str:
@@ -26,41 +30,50 @@ def parse_json(value: str, default: Any) -> Any:
         return default
 
 
-@lru_cache(maxsize=1)
-def spreadsheet():
-    client = gspread.service_account_from_dict(
-        google_service_account(), scopes=["https://www.googleapis.com/auth/spreadsheets"])
-    return client.open_by_key(google_sheet_id())
+def _web_app_url() -> str:
+    url = google_apps_script_url()
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or parsed.netloc != "script.google.com" or not parsed.path.endswith("/exec"):
+        raise RuntimeError("GOOGLE_APPS_SCRIPT_URL에는 Apps Script Web App의 HTTPS /exec URL을 입력하세요.")
+    return url
 
 
-def worksheet(name: str):
-    if name not in SHEET_HEADERS:
-        raise ValueError(f"허용되지 않은 시트입니다: {name}")
-    book = spreadsheet()
+def _request(action: str, **payload: Any) -> Any:
     try:
-        sheet = book.worksheet(name)
-    except WorksheetNotFound:
-        sheet = book.add_worksheet(title=name, rows=1000, cols=max(12, len(SHEET_HEADERS[name])))
-    expected = SHEET_HEADERS[name]
-    current = sheet.row_values(1)
-    if not current:
-        sheet.append_row(expected, value_input_option="RAW")
-    elif current != expected:
-        raise RuntimeError(f"'{name}' 시트의 1행 컬럼을 README의 권장 구조와 동일하게 맞춰 주세요.")
-    return sheet
+        response = httpx.post(_web_app_url(), json={"action": action, **payload}, timeout=TIMEOUT_SECONDS,
+                              follow_redirects=True)
+        response.raise_for_status()
+        body = response.json()
+    except httpx.TimeoutException as exc:
+        raise GoogleSheetsAPIError("Google Apps Script 요청 시간이 초과되었습니다.") from exc
+    except httpx.HTTPError as exc:
+        status = getattr(exc.response, "status_code", None)
+        suffix = f" (HTTP {status})" if status else ""
+        raise GoogleSheetsAPIError(f"Google Apps Script 요청에 실패했습니다{suffix}.") from exc
+    except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise GoogleSheetsAPIError("Google Apps Script가 올바른 JSON을 반환하지 않았습니다.") from exc
+    if not isinstance(body, dict) or not body.get("ok"):
+        message = body.get("error", "알 수 없는 오류") if isinstance(body, dict) else "응답 형식 오류"
+        raise GoogleSheetsAPIError(f"Google Apps Script 오류: {message}")
+    return body.get("data")
 
 
 def ensure_schema() -> dict[str, int]:
-    return {name: worksheet(name).row_count for name in SHEET_HEADERS}
+    data = _request("ensure_schema")
+    return {name: int((data or {}).get(name, 0)) for name in SHEET_HEADERS}
 
 
 def records(name: str) -> list[dict[str, str]]:
-    return worksheet(name).get_all_records(default_blank="", numericise_ignore=["all"])
+    if name not in SHEET_HEADERS:
+        raise ValueError(f"허용되지 않은 시트입니다: {name}")
+    data = _request("records", sheet=name)
+    return data if isinstance(data, list) else []
 
 
 def append_record(name: str, data: dict[str, Any]) -> None:
-    headers = SHEET_HEADERS[name]
-    worksheet(name).append_row([str(data.get(header, "")) for header in headers], value_input_option="RAW")
+    if name not in SHEET_HEADERS:
+        raise ValueError(f"허용되지 않은 시트입니다: {name}")
+    _request("append_record", sheet=name, data=data)
 
 
 def find_record(name: str, key: str, value: str) -> tuple[int, dict[str, str]] | None:
@@ -72,19 +85,19 @@ def find_record(name: str, key: str, value: str) -> tuple[int, dict[str, str]] |
 
 
 def update_record(name: str, row_number: int, changes: dict[str, Any]) -> None:
-    headers = SHEET_HEADERS[name]
-    invalid = set(changes) - set(headers)
+    if name not in SHEET_HEADERS:
+        raise ValueError(f"허용되지 않은 시트입니다: {name}")
+    invalid = set(changes) - set(SHEET_HEADERS[name])
     if invalid:
         raise ValueError(f"허용되지 않은 컬럼입니다: {', '.join(sorted(invalid))}")
-    sheet = worksheet(name)
-    for key, value in changes.items():
-        sheet.update_cell(row_number, headers.index(key) + 1, str(value if value is not None else ""))
+    _request("update_record", sheet=name, row_number=int(row_number), changes=changes)
 
 
 def delete_record(name: str, row_number: int) -> None:
-    worksheet(name).delete_rows(row_number)
+    if name not in SHEET_HEADERS:
+        raise ValueError(f"허용되지 않은 시트입니다: {name}")
+    _request("delete_record", sheet=name, row_number=int(row_number))
 
 
 def connection_status() -> dict[str, int]:
-    ensure_schema()
-    return {name: len(records(name)) for name in SHEET_HEADERS}
+    return ensure_schema()

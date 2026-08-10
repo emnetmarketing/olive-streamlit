@@ -63,8 +63,7 @@ if retention_saved:
 
 st.subheader("서버 Secret 상태")
 st.write({
-    "Google Sheet ID": "설정됨" if secret("GOOGLE_SHEET_ID") else "미설정",
-    "Google 서비스 계정": "설정됨" if secret("gcp_service_account") else "미설정",
+    "Google Apps Script URL": "설정됨" if secret("GOOGLE_APPS_SCRIPT_URL") else "미설정",
     "네이버 Client ID": "설정됨" if secret("NAVER_CLIENT_ID") else "미설정",
     "네이버 Client Secret": "설정됨" if secret("NAVER_CLIENT_SECRET") else "미설정",
     "Teams Webhook": "설정됨" if secret("TEAMS_WEBHOOK_URL") else "미설정",
